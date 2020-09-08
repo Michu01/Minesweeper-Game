@@ -1,90 +1,102 @@
 #include "Board.h"
 
-Board::Board()
+Board::Board(const Vector2f& pos) 
+	: isFilled(false), pos(pos), size(10)
 {
-	size = 10;
-	bombCount = 10;
-}
+	Field field(Vector2f(40, 40));
 
-Board::~Board()
-{
-
-}
-
-void Board::setPos(Vector2f m_pos)
-{
-	pos = m_pos;
-}
-
-int Board::getFlagCount()
-{
-	int flagCount{ 0 };
-	for (auto field : fields)
-		if (field.checkIfFlag())
-			flagCount++;
-	return flagCount;
-}
-
-int Board::getBombCount()
-{
-	return bombCount;
-}
-
-int Board::getRevealedCount()
-{
-	int revealedCount{ 0 };
-	for (auto field : fields)
-		if (field.checkIfRevealed())
-			revealedCount++;
-	return revealedCount;
-}
-
-bool Board::checkIfWin()
-{
-	if (powf((float)size, 2) - getRevealedCount() == bombCount)
-		return true;
-	else return false;
-}
-
-void Board::create()
-{
-	Field field;
-	field.setSize(Vector2f(40, 40));
-
-	for (int n = 0; n < size; n++)
-		for (int m = 0; m < size; m++)
+	for (int n = 0; n < size; ++n)
+		for (int m = 0; m < size; ++m)
 		{
 			field.setPos(Vector2f(pos.x + m * 40, pos.y + n * 40));
 			fields.push_back(field);
 		}
+
+	random_device rd;
+	random.seed(rd());
 }
 
-void Board::fill(Vector2i mouse)
+void Board::restart()
 {
-	int clickedNum{ 0 };
-	for (int n = 0; n < size * size; n++)
-		if (fields[n].checkIfClicked(mouse))
-		{
-			clickedNum = n;
-			break;
-		}
+	for(auto& field : fields)
+		field.restart();
 
-	int bombs{ 0 };
-	while (bombs < bombCount)
+	isFilled = false;
+}
+
+bool Board::clickField(const Vector2i& mouse)
+{
+	int index{ getFieldIndex(mouse) };
+
+	if (index != -1)
 	{
-		int random = rand() % (size * size);
-		if (!fields[random].checkIfBomb() && random != clickedNum)
+		if (!isFilled) fill(index);
+		
+		floodReveal(index);
+
+		if (fields[index].getIsBomb())
 		{
-			bombs++;
-			fields[random].setBomb();
+			revealBombs();
+			return true;
 		}
 	}
 
-	for (int n = 0; n < size * size; n++)
+	return false;
+}
+
+void Board::setFlag(const Vector2i& mouse)
+{
+	int index{ getFieldIndex(mouse) };
+	if (isFilled && index != -1) fields[index].setFlag();
+}
+
+int Board::getFlagCount() const
+{
+	int flagCount{ 0 };
+	for (const auto& field : fields)
+		if (field.getIsFlag())
+			++flagCount;
+	return flagCount;
+}
+
+int Board::getBombCount() const
+{
+	return size;
+}
+
+int Board::getRevealedCount() const
+{
+	int revealedCount{ 0 };
+	for (const auto& field : fields)
+		if (field.getIsRevealed())
+			++revealedCount;
+	return revealedCount;
+}
+
+bool Board::checkIfWin() const
+{
+	return size * size - getRevealedCount() == size;
+}
+
+void Board::fill(const int& index)
+{
+	uniform_int_distribution<int> dist(0, size * size - 1);
+	int bombs{ 0 };
+	while (bombs < size)
 	{
-		if (fields[n].checkIfBomb())
+		int n{ dist(random) };
+		if (!fields[n].getIsBomb() && n != index)
 		{
-			int lineNum = n / size;
+			++bombs;
+			fields[n].setBomb();
+		}
+	}
+
+	for (int n = 0; n < size * size; ++n)
+	{
+		if (fields[n].getIsBomb())
+		{
+			int lineNum{ n / size };
 
 			if (n - 1 >= lineNum * size)
 				fields[n - 1].addValue();
@@ -111,77 +123,69 @@ void Board::fill(Vector2i mouse)
 				fields[n + size + 1].addValue();
 		}
 	}
+
+	isFilled = true;
 }
 
-void Board::clear()
+void Board::floodReveal(const int& index)
 {
-	fields.clear();
-}
+	stack<int> indices;
+	indices.push(index);
 
-void Board::floodReveal(int n)
-{
-	fields[n].reveal();
-
-	if (fields[n].getValue() == 0 && !fields[n].checkIfBomb())
+	while (!indices.empty())
 	{
-		int lineNum = n / size;
+		int index{ indices.top() };
+		indices.pop();
 
-		if (n - 1 >= lineNum * size)
-			if (!fields[n - 1].checkIfBomb() && !fields[n - 1].checkIfRevealed())
-				floodReveal(n - 1);
+		if (fields[index].getValue() == 0 && !fields[index].getIsBomb() && !fields[index].getIsRevealed())
+		{
+			int lineNum{ index / size };
 
-		if (n + 1 < (lineNum + 1) * size)
-			if (!fields[n + 1].checkIfBomb() && !fields[n + 1].checkIfRevealed())
-				floodReveal(n + 1);
+			if (index - 1 >= lineNum * size && !fields[index - 1].getIsRevealed())
+					indices.push(index - 1);
 
-		if (n - size >= 0)
-			if (!fields[n - size].checkIfBomb() && !fields[n - size].checkIfRevealed())
-				floodReveal(n - size);
+			if (index + 1 < (lineNum + 1) * size && !fields[index + 1].getIsRevealed())
+					indices.push(index + 1);
 
-		if (n + size < size * size)
-			if (!fields[n + size].checkIfBomb() && !fields[n + size].checkIfRevealed())
-				floodReveal(n + size);
+			if (index - size >= 0 && !fields[index - size].getIsRevealed())
+					indices.push(index - size);
 
-		if (n - size - 1 >= 0 && n - 1 >= lineNum * size)
-			if (!fields[n - size - 1].checkIfBomb() && !fields[n - size - 1].checkIfRevealed())
-				floodReveal(n - size - 1);
+			if (index + size < size * size && !fields[index + size].getIsRevealed())
+					indices.push(index + size);
 
-		if (n - size + 1 >= 0 && n + 1 < (lineNum + 1) * size)
-			if (!fields[n - size + 1].checkIfBomb() && !fields[n - size + 1].checkIfRevealed())
-				floodReveal(n - size + 1);
+			if (index - size - 1 >= 0 && index - 1 >= lineNum * size && !fields[index - size - 1].getIsRevealed())
+					indices.push(index - size - 1);
 
-		if (n + size - 1 < size * size && n - 1 >= lineNum * size)
-			if (!fields[n + size - 1].checkIfBomb() && !fields[n + size - 1].checkIfRevealed())
-				floodReveal(n + size - 1);
+			if (index - size + 1 >= 0 && index + 1 < (lineNum + 1) * size && !fields[index - size + 1].getIsRevealed())
+					indices.push(index - size + 1);
 
-		if (n + size + 1 < size * size && n + 1 < (lineNum + 1) * size)
-			if (!fields[n + size + 1].checkIfBomb() && !fields[n + size + 1].checkIfRevealed())
-				floodReveal(n + size + 1);
+			if (index + size - 1 < size * size && index - 1 >= lineNum * size && !fields[index + size - 1].getIsRevealed())
+					indices.push(index + size - 1);
+
+			if (index + size + 1 < size * size && index + 1 < (lineNum + 1) * size && !fields[index + size + 1].getIsRevealed())
+					indices.push(index + size + 1);
+		}
+		fields[index].reveal();
 	}
 }
 
 void Board::revealBombs()
 {
 	for (auto& field : fields)
-		if (field.checkIfBomb())
+		if (field.getIsBomb())
 			field.reveal();
 }
 
-Field* Board::getFieldPointer(Vector2i mouse)
+int Board::getFieldIndex(const Vector2i& mouse) const
 {
-	for (auto& field : fields)
-		if (field.checkIfClicked(mouse))
-			return field.getPointer();
-	return nullptr;
+	for (int n = 0; n < (int)fields.size(); ++n)
+		if (fields[n].getIsClicked(mouse))
+			return n;
+	return -1;
 }
 
-int Board::getIndex(Field* fieldPtr)
+void Board::draw(RenderTarget& target, const Font& font, const Texture& tex) const
 {
-	return fieldPtr - &fields[0];
-}
-
-void Board::draw(RenderTarget* target, Font* font, Texture* tex)
-{
-	for (auto field : fields)
+	for (const auto& field : fields)
 		field.draw(target, font, tex);
 }

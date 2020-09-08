@@ -11,23 +11,20 @@ class Button
 private:
 	Vector2f pos;
 	Vector2f size;
+
 	string str;
 
-	int clickCooldown;
+	float delay;
+
+	Clock clock;
 
 public:
-	Button();
+	Button(const Vector2f& pos, const Vector2f& size, const string& str);
 
-	~Button();
+	void setString(const string& str);
 
-	void setPos(Vector2f m_pos);
+	bool checkIfClicked(const Vector2i& mouse);
 
-	void setSize(Vector2f m_size);
-
-	void setString(string m_str);
-
-	bool checkIfClicked(Vector2i mouse);
-
-	void draw(RenderTarget* target, Font* font);
+	void draw(RenderTarget& target, const Font& font) const;
 };
 

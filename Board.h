@@ -1,49 +1,52 @@
 #pragma once
-
 #include "Field.h"
 
+#include <stack>
 #include <vector>
+#include <random>
+
+using namespace std;
 
 class Board
 {
 private:
 	Vector2f pos;
 
-	std::vector<Field> fields;
+	vector<Field> fields;
 
 	int size;
-	int bombCount;
 
-public:
-	Board();
-
-	~Board();
-
-	void setPos(Vector2f m_pos);
-
-	int getFlagCount();
-
-	int getBombCount();
-
-	int getRevealedCount();
+	bool isFilled;
 	
-	bool checkIfWin();
+	mt19937 random;
 
-	void create();
+private:
+	void fill(const int& index);
 
-	void fill(Vector2i mouse);
+	void floodReveal(const int& index);
 
-	void clear();
+	int getFieldIndex(const Vector2i& mouse) const;
 
-	void floodReveal(int n);
+	int getRevealedCount() const;
 
 	void revealBombs();
 
-	Field* getFieldPointer(Vector2i mouse);
+public:
+	Board(const Vector2f& pos);
 
-	int getIndex(Field* fieldPtr);
+	void restart();
 
-	void draw(RenderTarget* target, Font* font, Texture* tex);
+	bool clickField(const Vector2i& mouse);
+
+	void setFlag(const Vector2i& mouse);
+
+	int getFlagCount() const;
+
+	int getBombCount() const;
+	
+	bool checkIfWin() const;
+
+	void draw(RenderTarget& target, const Font& font, const Texture& tex) const;
 
 };
 

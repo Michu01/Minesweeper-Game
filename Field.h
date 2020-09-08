@@ -6,6 +6,7 @@ using namespace sf;
 
 class Field
 {
+	friend class Board;
 private:
 	Vector2f pos;
 	Vector2f size;
@@ -16,35 +17,31 @@ private:
 	bool isBomb;
 	bool isFlag;
 
-public:
-	Field();
+private:
+	Field(const Vector2f& size);
 
-	~Field();
+	void restart();
 
-	void setPos(Vector2f m_pos);
-
-	void setSize(Vector2f m_size);
+	void setPos(const Vector2f& pos);
 
 	void addValue();
-
-	int getValue();
 
 	void reveal();
 
 	void setFlag();
 
-	bool checkIfFlag();
-
-	bool checkIfRevealed();
-
-	bool checkIfClicked(Vector2i mouse);
-
-	Field* getPointer();
-
-	bool checkIfBomb();
-
 	void setBomb();
 
-	void draw(RenderTarget* target, Font* font, Texture* tex);
+	int getValue() const;
+
+	bool getIsFlag() const;
+
+	bool getIsBomb() const;
+
+	bool getIsRevealed() const;
+
+	bool getIsClicked(const Vector2i& mouse) const;
+
+	void draw(RenderTarget& target, const Font& font, const Texture& tex) const;
 };
 
